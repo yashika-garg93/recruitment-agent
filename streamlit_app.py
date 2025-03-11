@@ -5,12 +5,12 @@ import PyPDF2
 import requests
 from bs4 import BeautifulSoup
 from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
+from langchain.vectorstores import FAISS
 
 # ---------- STREAMLIT CONFIG ---------- #
 st.set_page_config(page_title="AI Recruitment Agent", layout="wide")
 
-st.title("🤖 AI Recruitment Agent (RAG-powered)")
+st.title("🤖 AI Recruitment Agent (RAG-powered with FAISS)")
 st.markdown("""
 Upload your background once. Provide JD links and application questions.  
 Get personalized responses instantly!
@@ -24,16 +24,12 @@ if not openai_api_key:
     st.sidebar.warning("⚠️ Please enter your OpenAI API Key to proceed.")
     st.stop()
 
-# ---------- INITIALIZE OPENAI + CHROMA MEMORY ---------- #
+# ---------- INITIALIZE OPENAI + FAISS MEMORY ---------- #
 openai.api_key = openai_api_key
 
 # Initialize OpenAI Embeddings (RAG)
 embedding_model = OpenAIEmbeddings(openai_api_key=openai_api_key)
-chroma_client = Chroma(
-    collection_name="user_background",
-    embedding_function=embedding_model,
-    persist_directory="./chroma_db"
-)
+
 # ---------- UTILITY FUNCTION: EXTRACT TEXT FROM PDF ---------- #
 def extract_text_from_pdf(file):
     pdf_reader = PyPDF2.PdfReader(file)
@@ -53,16 +49,18 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True
 )
 
+documents = []
 if uploaded_files:
     st.info(f"{len(uploaded_files)} files uploaded. Extracting and storing in memory...")
-    documents = []
     for file in uploaded_files:
         file_text = extract_text_from_pdf(file)
         documents.append(file_text)
     
-    # Store embeddings in ChromaDB
-    chroma_client.add_texts(documents)
+    # Create FAISS VectorStore from uploaded docs
+    faiss_index = FAISS.from_texts(documents, embedding_model)
     st.success("✅ Background information stored successfully!")
+else:
+    faiss_index = None
 
 # ---------- STEP 2: PROVIDE JOB DESCRIPTION LINK ---------- #
 st.header("Step 2: Provide the Job Description Link")
@@ -98,7 +96,9 @@ if questions:
 
 # ---------- STEP 4: RETRIEVE BACKGROUND INFO FOR EACH QUESTION ---------- #
 def retrieve_relevant_background(question):
-    retriever = chroma_client.as_retriever(search_kwargs={"k": 5})
+    if faiss_index is None:
+        return ""
+    retriever = faiss_index.as_retriever(search_kwargs={"k": 5})
     docs = retriever.get_relevant_documents(question)
     return "\n\n".join([doc.page_content for doc in docs])
 
@@ -110,6 +110,8 @@ if st.button("Generate Answers"):
         st.warning("⚠️ Please provide a Job Description link first!")
     elif not questions_list:
         st.warning("⚠️ Please enter at least one application question.")
+    elif not faiss_index:
+        st.warning("⚠️ Please upload background documents first!")
     else:
         st.info("Generating answers... This may take a moment.")
 
