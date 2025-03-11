@@ -1,6 +1,6 @@
 streamlit
 openai
 langchain==0.0.208
-chromadb
+faiss-cpu
 PyPDF2
 beautifulsoup4
