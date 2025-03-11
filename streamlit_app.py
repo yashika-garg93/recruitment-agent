@@ -29,8 +29,11 @@ openai.api_key = openai_api_key
 
 # Initialize OpenAI Embeddings (RAG)
 embedding_model = OpenAIEmbeddings(openai_api_key=openai_api_key)
-chroma_client = Chroma(collection_name="user_background", embedding_function=embedding_model)
-
+chroma_client = Chroma(
+    collection_name="user_background",
+    embedding_function=embedding_model,
+    persist_directory="./chroma_db"
+)
 # ---------- UTILITY FUNCTION: EXTRACT TEXT FROM PDF ---------- #
 def extract_text_from_pdf(file):
     pdf_reader = PyPDF2.PdfReader(file)
