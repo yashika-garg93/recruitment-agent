@@ -1,0 +1,6 @@
+streamlit
+openai
+langchain
+chromadb
+PyPDF2
+beautifulsoup4
